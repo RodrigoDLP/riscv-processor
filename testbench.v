@@ -12,7 +12,8 @@ module tb();
   initial begin
     clk = 1; reset = 1; #10
     reset = 0;
-    #5000
+    #300
+    $display("RAM96=%h, RAM100=%h", a.dmem.RAM[24], a.dmem.RAM[25]);
     $finish;
   end
   initial begin
