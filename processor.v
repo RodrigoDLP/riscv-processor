@@ -1,5 +1,3 @@
-// Code your design here
-// Code your design here
 module adder(input  [31:0] a, b, output [31:0] y);
   assign y = a + b; 
 endmodule
@@ -65,7 +63,7 @@ module controller(input [6:0] op, input [2:0] funct3, input funct7b5,
   aludec ad(.opb5(op[5]), .funct3(funct3), .funct7b5(funct7b5), .ALUOp(ALUOp), .ALUControl(ALUControlD)); 
 endmodule
 
-module controller_registers(input clk,
+module controller_registers(input clk, input reset,
                             input RegWriteD,
                             input [1:0] ResultSrcD,
                             input MemWriteD,
@@ -76,8 +74,8 @@ module controller_registers(input clk,
                             input [1:0] ImmSrc,
                             input ZeroE,
                             output PCSrcE, ResultSrcE0,
-                            output reg [1:0] ImmSrcD,
-                            output reg [1:0] ALUSrcE,
+                            output [1:0] ImmSrcD,
+                            output reg ALUSrcE,
                             output reg [2:0] ALUControlE,
                             output reg MemWriteM,
                             output reg [1:0] ResultSrcW,
@@ -86,18 +84,18 @@ module controller_registers(input clk,
   reg [1:0] ResultSrcE, ResultSrcM;
   assign ImmSrcD = ImmSrc;
   always @(posedge clk) begin
-    RegWriteE = RegWriteD;
-    ResultSrcE = ResultSrcD;
-    MemWriteE = MemWriteD;
-    JumpE = JumpD;
-    BranchE = BranchD;
-    ALUControlE = ALUControlD;
-    ALUSrcE = ALUSrcD;
-    RegWriteM = RegWriteE;
-    ResultSrcM = ResultSrcE;
-    MemWriteM = MemWriteE;
-    RegWriteW = RegWriteM;
-    ResultSrcW = ResultSrcM;
+    if (reset) RegWriteE <= 0; else RegWriteE <= RegWriteD;
+    if (reset) ResultSrcE <= 0; else ResultSrcE <= ResultSrcD;
+    if (reset) MemWriteE <= 0; else MemWriteE <= MemWriteD;
+    if (reset) JumpE <= 0; else JumpE <= JumpD;
+    if (reset) BranchE <= 0; else BranchE <= BranchD;
+    if (reset) ALUControlE <= 0; else ALUControlE <= ALUControlD;
+    if (reset) ALUSrcE <= 0; else ALUSrcE <= ALUSrcD;
+    if (reset) RegWriteM <= 0; else RegWriteM <= RegWriteE;
+    if (reset) ResultSrcM <= 0; else ResultSrcM <= ResultSrcE;
+    if (reset) MemWriteM <= 0; else MemWriteM <= MemWriteE;
+    if (reset) RegWriteW <= 0; else RegWriteW <= RegWriteM;
+    if (reset) ResultSrcW <= 0; else ResultSrcW <= ResultSrcM;
   end
   assign PCSrcE = (ZeroE & BranchE) | JumpE;
   assign ResultSrcE0 = ResultSrcE[0];
@@ -123,7 +121,7 @@ module datapath(input clk, reset,
                 input [1:0] ResultSrcW, ImmSrcD,
                 input [2:0] ALUControlE,
                 output ZeroE,
-                output reg [31:0] PCF, WriteDataM,
+                output reg [31:0] PCF, WriteDataM, InstrD,
                 output reg [31:0] ALUResultM,
                 input [31:0] Instr, ReadData,
                 input [1:0] ForwardAE, ForwardBE,
@@ -140,13 +138,13 @@ module datapath(input clk, reset,
     
   wire [4:0] RdD;
   
-  reg [31:0] InstrD, PCD, PCPlus4D, RD1E, RD2E, PCE, ImmExtE, PCPlus4E, PCPlus4M,
+  reg [31:0] PCD, PCPlus4D, RD1E, RD2E, PCE, ImmExtE, PCPlus4E, PCPlus4M,
   ALUResultW, ReadDataW, PCPlus4W;
   //FETCH
   mux2 #(WIDTH) pcmux(.d0(PCPlus4F), .d1(PCTargetE), .s(PCSrcE), .y(PCFprime));
   adder pcadd4(.a(PCF), .b({WIDTH{1'b0}} + 4), .y(PCPlus4F));
   //DECODE
-  regfile rf(.clk(clk), .we3(RegWriteW), .a1(InstrD[19:15]), .a2(InstrD[24:20]), .a3(RdW),
+  regfile rf(.clk(clk), .reset(reset), .we3(RegWriteW), .a1(InstrD[19:15]), .a2(InstrD[24:20]), .a3(RdW),
              .wd3(ResultW), .rd1(RFRD1), .rd2(RFRD2));
   assign RdD = InstrD[11:7];
   assign Rs1D = InstrD[19:15];
@@ -168,53 +166,29 @@ module datapath(input clk, reset,
   assign PCSrcEout = PCSrcE;
   
   always @(posedge clk) begin
-    if (!StallF) PCF <= PCFprime;
-    if (FlushD) InstrD <= 0; else if (!StallD) InstrD <= Instr;
-    if (FlushD) PCD <= 0; else if (!StallD) PCD <= PCF;
-    if (FlushD) PCPlus4D <= 0; else if (!StallD) PCPlus4D <= PCPlus4F;
-    if (FlushE) RD1E <= 0; else RD1E <= RFRD1;
-    if (FlushE) RD2E <= 0; else RD2E <= RFRD2;
-    if (FlushE) PCE <= 0; else PCE <= PCD;
-    if (FlushE) Rs1E <= 0; else Rs1E <= Rs1D;
-    if (FlushE) Rs2E <= 0; else Rs2E <= Rs2D;
-    if (FlushE) RdE <= 0; else RdE <= RdD;
-    if (FlushE) ImmExtE <= 0; else ImmExtE <= ImmExtD;
-    if (FlushE) PCPlus4E <= 0; else PCPlus4E <= PCPlus4D;
-    ALUResultM <= ALUResultE;
-    WriteDataM <= WriteDataE;
-    RdM <= RdE;
-    PCPlus4M <= PCPlus4E;
-    ALUResultW <= ALUResultM;
-    ReadDataW <= ReadData;
-    RdW <= RdM;
-    PCPlus4W <= PCPlus4M;
+    if (reset) PCF <= 0; else if (!StallF) PCF <= PCFprime;
+    if (FlushD || reset) InstrD <= 0; else if (!StallD) InstrD <= Instr;
+    if (FlushD || reset) PCD <= 0; else if (!StallD) PCD <= PCF;
+    if (FlushD || reset) PCPlus4D <= 0; else if (!StallD) PCPlus4D <= PCPlus4F;
+    if (FlushE || reset) RD1E <= 0; else RD1E <= RFRD1;
+    if (FlushE || reset) RD2E <= 0; else RD2E <= RFRD2;
+    if (FlushE || reset) PCE <= 0; else PCE <= PCD;
+    if (FlushE || reset) Rs1E <= 0; else Rs1E <= Rs1D;
+    if (FlushE || reset) Rs2E <= 0; else Rs2E <= Rs2D;
+    if (FlushE || reset) RdE <= 0; else RdE <= RdD;
+    if (FlushE || reset) ImmExtE <= 0; else ImmExtE <= ImmExtD;
+    if (FlushE || reset) PCPlus4E <= 0; else PCPlus4E <= PCPlus4D;
+    if (reset) ALUResultM <= 0; else ALUResultM <= ALUResultE;
+    if (reset) WriteDataM <= 0; else WriteDataM <= WriteDataE;
+    if (reset) RdM <= 0; else RdM <= RdE;
+    if (reset) PCPlus4M <= 0; else PCPlus4M <= PCPlus4E;
+    if (reset) ALUResultW <= 0; else ALUResultW <= ALUResultM;
+    if (reset) ReadDataW <= 0; else ReadDataW <= ReadData;
+    if (reset) RdW <= 0; else RdW <= RdM;
+    if (reset) PCPlus4W <= 0; else PCPlus4W <= PCPlus4M;
   end
-  
-  /*
-  
-  // next PC logic
-  flopr #(WIDTH) pcreg(.clk(clk), .reset(reset), .d(PCNext), .q(PC)); 
-  adder pcadd4(.a(PC), .b({WIDTH{1'b0}} + 4), // Using WIDTH parameter for constant 4
-    .y(PCPlus4)); 
-  
-  adder pcaddbranch(.a(PC), .b(ImmExt), .y(PCTarget)); 
-  mux2 #(WIDTH)  pcmux(.d0(PCPlus4), .d1(PCTarget), .s(PCSrc), .y(PCNext)); 
-  
-  // register file logic
-  regfile rf(.clk(clk), .we3(RegWrite), .a1(Instr[19:15]), .a2(Instr[24:20]), .a3(Instr[11:7]), 
-    .wd3(Result), .rd1(SrcA), .rd2(WriteData)); 
-  extend ext(.instr(Instr[31:7]), .immsrc(ImmSrc), .immext(ImmExt)); 
-  
-  
-  
-  // ALU logic
-  mux2 #(WIDTH)  srcbmux(.d0(WriteData), .d1(ImmExt), .s(ALUSrc), .y(SrcB)); 
-  alu alu(.a(SrcA), .b(SrcB), .alucontrol(ALUControl), .result(ALUResult), .zero(Zero)); 
-  mux3 #(WIDTH) resultmux(.d0(ALUResult), .d1(ReadData), .d2(PCPlus4), .s(ResultSrc), .y(Result)); */
+
 endmodule
-//=============================================
-
-
 
 
 
@@ -263,6 +237,8 @@ endmodule
 module imem(input  [31:0] a, output [31:0] rd);
   reg [31:0] RAM[63:0]; 
   initial begin
+    integer j;
+  for (j=0; j<64; j=j+1) RAM[j] = 32'b0;
     $readmemh("instructions.hex",RAM); 
   end
   assign rd = RAM[a[31:2]]; // word aligned
@@ -275,13 +251,14 @@ module maindec(input  [6:0] op, output [1:0] ResultSrc, output MemWrite, output 
           ResultSrc, Branch, ALUOp, Jump} = controls; 
   always @* case(op)
     // RegWrite_ImmSrc_ALUSrc_MemWrite_ResultSrc_Branch_ALUOp_Jump
-      7'b0000011: controls = 11'b1_00_1_0_01_0_00_0; // lw
-      7'b0100011: controls = 11'b0_01_1_1_00_0_00_0; // sw
-      7'b0110011: controls = 11'b1_xx_0_0_00_0_10_0; // R-type
-      7'b1100011: controls = 11'b0_10_0_0_00_1_01_0; // beq
-      7'b0010011: controls = 11'b1_00_1_0_00_0_10_0; // I-type ALU
-      7'b1101111: controls = 11'b1_11_0_0_10_0_00_1; // jal
-      default:    controls = 11'bx_xx_x_x_xx_x_xx_x; // non-implemented instruction
+      7'b0000011: controls <= 11'b1_00_1_0_01_0_00_0; // lw
+      7'b0100011: controls <= 11'b0_01_1_1_00_0_00_0; // sw
+      7'b0110011: controls <= 11'b1_xx_0_0_00_0_10_0; // R-type
+      7'b1100011: controls <= 11'b0_10_0_0_00_1_01_0; // beq
+      7'b0010011: controls <= 11'b1_00_1_0_00_0_10_0; // I-type ALU
+      7'b1101111: controls <= 11'b1_11_0_0_10_0_00_1; // jal
+    7'b0000000: controls <= 11'b0; //safety measure for after reset
+      default:    controls <= 11'bx_xx_x_x_xx_x_xx_x; // non-implemented instruction
     endcase
 endmodule
 
@@ -295,12 +272,16 @@ module mux3 (input  [WIDTH-1:0] d0, d1, d2, input [1:0] s, output [WIDTH-1:0] y)
   assign y = s[1] ? d2 : (s[0] ? d1 : d0); 
 endmodule
 
-module regfile(input  clk, input  we3, input  [ 4:0] a1, a2, a3, 
+module regfile(input  clk, input reset, input  we3, input  [ 4:0] a1, a2, a3, 
                input  [31:0] wd3, output [31:0] rd1, rd2); 
   reg [31:0] rf[31:0]; 
   // write third port on rising edge of clock (A3/WD3/WE3)
-  always @(posedge clk) begin 
-    if (we3) rf[a3] <= wd3; 
+  integer i;
+  always @(negedge clk) begin
+    if (reset) begin
+      for (i = 0; i < 32; i = i + 1)
+        rf[i] <= 32'b0;   // clear a todos los registros.
+    end else if (we3) rf[a3] <= wd3; 
   end
   // read two ports combinationally (A1/RD1, A2/RD2)
   // register 0 hardwired to 0
@@ -318,26 +299,24 @@ module riscvsingle(input  clk, reset, output [31:0] PC, input  [31:0] Instr, out
   wire [2:0] ALUControlD;
   wire [2:0] ALUControlE;
   wire PCSrcE; 
-
-  /*controller c(.op(Instr[6:0]), .funct3(Instr[14:12]), .funct7b5(Instr[30]), .Zero(Zero),
-    .ResultSrc(ResultSrc), .MemWrite(MemWrite), .PCSrc(PCSrc),.ALUSrc(ALUSrc), .RegWrite(RegWrite), 
-               .Jump(Jump), .ImmSrc(ImmSrc), .ALUControl(ALUControl));}*/
-  controller c(.op(Instr[6:0]), .funct3(Instr[14:12]), .funct7b5(Instr[30]), .ResultSrcD(ResultSrcD), .MemWriteD(MemWriteD),
+  wire [31:0] InstrD, PCF, WriteDataM, ALUResultM;
+  wire [1:0] ForwardAE, ForwardBE;
+  wire StallF, StallD, FlushD, FlushE, RegWriteMout, RegWriteWout, ResultSrcE0out, PCSrcEout;
+  wire [4:0] Rs1E, Rs2E, RdM, RdE, RdW, Rs1D, Rs2D; 
+  
+  controller c(.op(InstrD[6:0]), .funct3(InstrD[14:12]), .funct7b5(InstrD[30]), .ResultSrcD(ResultSrcD), .MemWriteD(MemWriteD),
                .JumpD(JumpD), .BranchD(BranchD), .ALUSrcD(ALUSrcD), .RegWriteD(RegWriteD), .ImmSrcD(ImmSrcDin),
                .ALUControlD(ALUControlD));
   
-  controller_registers cr(.clk(clk), .RegWriteD(RegWriteD), .ResultSrcD(ResultSrcD), .MemWriteD(MemWriteD), .JumpD(JumpD),
+  controller_registers cr(.clk(clk), .reset(reset), .RegWriteD(RegWriteD), .ResultSrcD(ResultSrcD), .MemWriteD(MemWriteD),
+                          .JumpD(JumpD),
                           .BranchD(BranchD), .ALUControlD(ALUControlD), .ALUSrcD(ALUSrcD), .ImmSrc(ImmSrcDin), .ZeroE(ZeroE),
                           .PCSrcE(PCSrcE), .ImmSrcD(ImmSrcD), .ALUSrcE(ALUSrcE), .ALUControlE(ALUControlE),
                           .MemWriteM(MemWriteM), .ResultSrcW(ResultSrcW), .RegWriteW(RegWriteW), .RegWriteM(RegWriteM),
                           .ResultSrcE0(ResultSrcE0));
   
-  wire [31:0] PCF, WriteDataM, ALUResultM;
-  wire [1:0] ForwardAE, ForwardBE;
-  wire StallF, StallD, FlushD, FlushE, RegWriteMout, RegWriteWout, ResultSrcE0out, PCSrcEout;
-  wire [4:0] Rs1E, Rs2E, RdM, RdE, RdW, Rs1D, Rs2D;
-  
-  datapath dp(.clk(clk), .reset(reset), .RegWriteM(RegWriteM), .MemWriteM(MemWriteM), .ALUSrcE(ALUSrcE), .PCSrcE(PCSrcE),
+  datapath dp(.clk(clk), .reset(reset), .RegWriteW(RegWriteW), .InstrD(InstrD),
+              .RegWriteM(RegWriteM), .MemWriteM(MemWriteM), .ALUSrcE(ALUSrcE), .PCSrcE(PCSrcE),
               .ResultSrcW(ResultSrcW), .ImmSrcD(ImmSrcD), .ALUControlE(ALUControlE), .ZeroE(ZeroE), .PCF(PCF), 
               .WriteDataM(WriteDataM), .ALUResultM(ALUResultM), .Instr(Instr), .ReadData(ReadData), .ForwardAE(ForwardAE),
               .ForwardBE(ForwardBE), .StallF(StallF), .StallD(StallD), .FlushE(FlushE), .RSE0in(ResultSrcE0),
@@ -348,21 +327,47 @@ module riscvsingle(input  clk, reset, output [31:0] PC, input  [31:0] Instr, out
                 .RegWriteW(RegWriteWout), .PCSrcE(PCSrcEout), .ResultSrcE0(ResultSrcE0out), .StallF(StallF), .StallD(StallD),
                 .FlushD(FlushD), .FlushE(FlushE), .ForwardAE(ForwardAE), .ForwardBE(ForwardBE));  
   
-  
   // DataAdr is connected to ALUResult
   assign DataAdr = ALUResultM;
   assign WriteData = WriteDataM;
   assign MemWrite = MemWriteM;
-  assign PCF = PC;
+  assign PC = PCF;
   
   
-  /*always @(posedge CLK) begin
-    $display("PC=%h | s0(x8)=%h s1(x9)=%h a0(x10)=%h | t0(x5)=%h t1(x6)=%h t2(x7)=%h t4(x29)=%h t5(x30)=%h", PC_curr, 
-             RF.rf[8], // s0 
-             RF.rf[9], // s1 
-             RF.rf[10], // a0 
-             RF.rf[5], // t0 RF.rf[6], // t1 RF.rf[7], // t2 RF.rf[29], // t4 RF.rf[30] // t5 );
-end*/
+  integer cycle;
+initial cycle = 0;
+
+always @(posedge clk) begin
+  cycle = cycle + 1;
+  $display("Cycle=%0d x2=%h x3=%h x4=%h x5=%h x7=%h x9=%h", cycle,
+           a.rvsingle.dp.rf.rf[2], a.rvsingle.dp.rf.rf[3], a.rvsingle.dp.rf.rf[4], a.rvsingle.dp.rf.rf[5],
+           a.rvsingle.dp.rf.rf[7], a.rvsingle.dp.rf.rf[9]);
+
+  // FETCH
+  $display("  F: PCF=%h InstrF=%h", PCF, Instr);
+
+  // DECODE
+  $display("  D: PCD=%h InstrD=%h Rs1D=%0d Rs2D=%0d RdD=%0d BranchD=%0d ImmSrcD=%b ImmExtD=%h Opcode=%b RegWriteD=%b",
+           dp.PCD, dp.InstrD, dp.Rs1D, dp.Rs2D, dp.RdD, cr.BranchD, dp.ImmSrcD, dp.ImmExtD, dp.InstrD[6:0], cr.RegWriteD);
+
+  // EXECUTE
+  $display("  E: PCE=%h RdE=%0d Rs1E=%0d RS2E=%0d SrcAE=%h SrcBE=%h ALUResultE=%h ZeroE=%b BranchE=%0d ImmExtE=%h RegWriteE=%b",
+           dp.PCE, dp.RdE, dp.Rs1E, dp.Rs2E, dp.SrcAE, dp.SrcBE, dp.ALUResultE, dp.ZeroE,  cr.BranchE, dp.ImmExtE, cr.RegWriteE);
+
+  // MEMORY
+  $display("  M: RdM=%0d ALUResultM=%h WriteDataM=%h, RegWriteM=%b",
+           dp.RdM, dp.ALUResultM, dp.WriteDataM, cr.RegWriteM);
+
+  // WRITEBACK
+  $display("  W: RdW=%0d ResultW=%h RegWriteW=%b",
+           dp.RdW, dp.ResultW, cr.RegWriteW);
+
+  //HAZARD
+  $display("  HAZARD: StallF=%b StallD=%b FlushD=%b FlushE=%b ForwardAE=%b ForwardBE=%b",
+           h.StallF, h.StallD, h.FlushD, h.FlushE, h.ForwardAE, h.ForwardBE);
+
+  $display("-----------------------------------------------------");
+end
 endmodule
 
 module top(input clk, reset, output [31:0] WriteData, DataAdr, output MemWrite);
