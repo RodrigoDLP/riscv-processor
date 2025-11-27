@@ -235,9 +235,10 @@ endmodule
 
 
 module imem(input  [31:0] a, output [31:0] rd);
-  reg [31:0] RAM[63:0]; 
+  reg [31:0] RAM[63:0];
+  integer j;
   initial begin
-    integer j;
+  
   for (j=0; j<64; j=j+1) RAM[j] = 32'b0;
     $readmemh("instructions.hex",RAM); 
   end
@@ -321,7 +322,7 @@ module riscvsingle(input  clk, reset, output [31:0] PC, input  [31:0] Instr, out
               .WriteDataM(WriteDataM), .ALUResultM(ALUResultM), .Instr(Instr), .ReadData(ReadData), .ForwardAE(ForwardAE),
               .ForwardBE(ForwardBE), .StallF(StallF), .StallD(StallD), .FlushE(FlushE), .RSE0in(ResultSrcE0),
               .Rs1E(Rs1E), .Rs2E(Rs2E), .RdM(RdM), .RdE(RdE), .RdW(RdW), .Rs1D(Rs1D), .Rs2D(Rs2D),
-              .RegWriteMout(RegWriteMout), .RegWriteWout(RegWriteWout), .RSE0out(ResultSrcE0out), .PCSrcEout(PCSrcEout));
+              .RegWriteMout(RegWriteMout), .RegWriteWout(RegWriteWout), .RSE0out(ResultSrcE0out), .PCSrcEout(PCSrcEout), .FlushD(FlushD));
   
   hazard_unit h(.Rs1D(Rs1D), .Rs2D(Rs2D), .Rs1E(Rs1E), .Rs2E(Rs2E), .RdE(RdE), .RdM(RdM), .RdW(RdW), .RegWriteM(RegWriteMout),
                 .RegWriteW(RegWriteWout), .PCSrcE(PCSrcEout), .ResultSrcE0(ResultSrcE0out), .StallF(StallF), .StallD(StallD),

@@ -12,7 +12,7 @@ module tb();
   initial begin
     clk = 1; reset = 1; #10
     reset = 0;
-    #5000
+    #300
     $finish;
   end
   initial begin
