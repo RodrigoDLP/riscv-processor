@@ -662,11 +662,11 @@ module hazard_unit(input [4:0] Rs1D, Rs2D, Rs1E, Rs2E, RdE, RdM, RdW,
   assign ForwardAE[0] = (Rs1E == RdW) & RegWriteW & (Rs1E != 0) & !((Rs1E == RdM) & RegWriteM);
   assign ForwardBE[1] = (Rs2E == RdM) & RegWriteM & (Rs2E != 0);
   assign ForwardBE[0] = (Rs2E == RdW) & RegWriteW & (Rs2E != 0) & !((Rs2E == RdM) & RegWriteM);
-  assign FloatForwardAE[1] = (Rs1E == RdM) & FloatRegWriteM & ALUPickerM & ALUPickerE & (Rs1E != 0);
-  assign FloatForwardAE[0] = (Rs1E == RdW) & FloatRegWriteW & ALUPickerW & ALUPickerE & (Rs1E != 0) 
+  assign FloatForwardAE[1] = (Rs1E == RdM) & FloatRegWriteM & ALUPickerM & (Rs1E != 0);
+  assign FloatForwardAE[0] = (Rs1E == RdW) & FloatRegWriteW & ALUPickerE & (Rs1E != 0) 
     & !((Rs1E == RdM) & FloatRegWriteM & ALUPickerM);
-  assign FloatForwardBE[1] = (Rs2E == RdM) & FloatRegWriteM & ALUPickerM & ALUPickerE & (Rs2E != 0);
-  assign FloatForwardBE[0] = (Rs2E == RdW) & FloatRegWriteW & ALUPickerW & ALUPickerE & (Rs2E != 0) 
+  assign FloatForwardBE[1] = (Rs2E == RdM) & FloatRegWriteM & ALUPickerM & (Rs2E != 0);
+  assign FloatForwardBE[0] = (Rs2E == RdW) & FloatRegWriteW & ALUPickerE & (Rs2E != 0) 
     & !((Rs2E == RdM) & FloatRegWriteM & ALUPickerM);
   wire lwStall;
   assign lwStall = ResultSrcE0 & ((Rs1D == RdE) | (Rs2D == RdE));
@@ -822,24 +822,26 @@ always @(posedge clk) begin
   $display("  F: PCF=%h InstrF=%h", PCF, Instr);
 
   // DECODE
-  $display("  D: PCD=%h InstrD=%h Rs1D=%0d Rs2D=%0d RdD=%0d BranchD=%0d ImmSrcD=%b ImmExtD=%h Opcode=%b RegWriteD=%b",
-           dp.PCD, dp.InstrD, dp.Rs1D, dp.Rs2D, dp.RdD, cr.BranchD, dp.ImmSrcD, dp.ImmExtD, dp.InstrD[6:0], cr.RegWriteD);
+  $display("  D: PCD=%h InstrD=%h Rs1D=%0d Rs2D=%0d RdD=%0d BranchD=%0d ImmSrcD=%b ImmExtD=%h Opcode=%b RegWriteD=%b FRFRD1=%h FRFRD2=%h ALUPickerD=%b FloatRegWriteD=%b",
+           dp.PCD, dp.InstrD, dp.Rs1D, dp.Rs2D, dp.RdD, cr.BranchD, dp.ImmSrcD, dp.ImmExtD, dp.InstrD[6:0], cr.RegWriteD, dp.FRFRD1, dp.FRFRD2, cr.ALUPickerD, cr.FloatRegWriteD);
 
   // EXECUTE
-  $display("  E: PCE=%h RdE=%0d Rs1E=%0d RS2E=%0d SrcAE=%h SrcBE=%h ALUResultE=%h ZeroE=%b BranchE=%0d ImmExtE=%h RegWriteE=%b",
-           dp.PCE, dp.RdE, dp.Rs1E, dp.Rs2E, dp.SrcAE, dp.SrcBE, dp.ALUResultE, dp.ZeroE,  cr.BranchE, dp.ImmExtE, cr.RegWriteE);
+  $display("  E: PCE=%h RdE=%0d Rs1E=%0d RS2E=%0d SrcAE=%h SrcBE=%h ALUResultE=%h ZeroE=%b BranchE=%0d ImmExtE=%h RegWriteE=%b FinalAluResult=%h FinalWriteDataE=%h FSrcAE=%h FSrcBE=%h ALUControlE=%b floatResultE=%h FRD1E=%h FRD2E=%h ALUPickerE=%b FloatRegWriteE=%b WriteDataE=%h",
+           dp.PCE, dp.RdE, dp.Rs1E, dp.Rs2E, dp.SrcAE, dp.SrcBE, dp.ALUResultE, dp.ZeroE,  cr.BranchE, dp.ImmExtE, cr.RegWriteE, dp.FinalAluResult, dp.FinalWriteDataE, dp.FSrcAE, dp.FSrcBE, dp.ALUControlE, dp.floatResultE, dp.FRD1E, dp.FRD2E, cr.ALUPickerE, cr.FloatRegWriteE, dp.WriteDataE);
 
+  
+  //alu32 floatalu(.a(FSrcAE), .b(FSrcBE), .ALUControl(ALUControlE), .f(floatResultE), .flags(floatFlags));
   // MEMORY
-  $display("  M: RdM=%0d ALUResultM=%h WriteDataM=%h, RegWriteM=%b",
-           dp.RdM, dp.ALUResultM, dp.WriteDataM, cr.RegWriteM);
+  $display("  M: RdM=%0d ALUResultM=%h WriteDataM=%h RegWriteM=%b ALUPickerM=%b FloatRegWriteM=%b",
+           dp.RdM, dp.ALUResultM, dp.WriteDataM, cr.RegWriteM, cr.ALUPickerM, cr.FloatRegWriteM);
 
   // WRITEBACK
-  $display("  W: RdW=%0d ResultW=%h RegWriteW=%b",
-           dp.RdW, dp.ResultW, cr.RegWriteW);
+  $display("  W: RdW=%0d ResultW=%h RegWriteW=%b ALUPickerW=%b FloatRegWriteW=%b",
+           dp.RdW, dp.ResultW, cr.RegWriteW, cr.ALUPickerW, cr.FloatRegWriteW);
 
   //HAZARD
-  $display("  HAZARD: StallF=%b StallD=%b FlushD=%b FlushE=%b ForwardAE=%b ForwardBE=%b",
-           h.StallF, h.StallD, h.FlushD, h.FlushE, h.ForwardAE, h.ForwardBE);
+  $display("  HAZARD: StallF=%b StallD=%b FlushD=%b FlushE=%b ForwardAE=%b ForwardBE=%b, FloatForwardAE=%b, FloatForwardBE=%b",
+           h.StallF, h.StallD, h.FlushD, h.FlushE, h.ForwardAE, h.ForwardBE, h.FloatForwardAE, h.FloatForwardBE);
 
   $display("-----------------------------------------------------");
 end
