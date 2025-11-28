@@ -678,9 +678,10 @@ endmodule
 
 
 module imem(input  [31:0] a, output [31:0] rd);
-  reg [31:0] RAM[63:0]; 
+  reg [31:0] RAM[63:0];
+  integer j;
   initial begin
-    integer j;
+  
   for (j=0; j<64; j=j+1) RAM[j] = 32'b0;
     $readmemh("instructions.hex",RAM); 
   end
@@ -793,9 +794,7 @@ module riscvsingle(input  clk, reset, output [31:0] PC, input  [31:0] Instr, out
               .ALUPickerWout(ALUPickerWout), .FloatRegWriteMout(FloatRegWriteMout), .FloatRegWriteWout(FloatRegWriteWout),
               .ForceR1ZeroE(ForceR1ZeroE));
   
-  
-  
-  
+
   hazard_unit h(.Rs1D(Rs1D), .Rs2D(Rs2D), .Rs1E(Rs1E), .Rs2E(Rs2E), .RdE(RdE), .RdM(RdM), .RdW(RdW), .RegWriteM(RegWriteMout),
                 .RegWriteW(RegWriteWout), .PCSrcE(PCSrcEout), .ResultSrcE0(ResultSrcE0out), .StallF(StallF), .StallD(StallD),
                 .FlushD(FlushD), .FlushE(FlushE), .ForwardAE(ForwardAE), .ForwardBE(ForwardBE), .FloatForwardAE(FloatForwardAE),
