@@ -320,7 +320,7 @@ module riscvsingle(input  clk, reset, output [31:0] PC, input  [31:0] Instr, out
               .RegWriteM(RegWriteM), .MemWriteM(MemWriteM), .ALUSrcE(ALUSrcE), .PCSrcE(PCSrcE),
               .ResultSrcW(ResultSrcW), .ImmSrcD(ImmSrcD), .ALUControlE(ALUControlE), .ZeroE(ZeroE), .PCF(PCF), 
               .WriteDataM(WriteDataM), .ALUResultM(ALUResultM), .Instr(Instr), .ReadData(ReadData), .ForwardAE(ForwardAE),
-              .ForwardBE(ForwardBE), .StallF(StallF), .StallD(StallD), .FlushE(FlushE), .RSE0in(ResultSrcE0),
+              .ForwardBE(ForwardBE), .StallF(StallF), .StallD(StallD), .FlushD(FlushD), .FlushE(FlushE), .RSE0in(ResultSrcE0),
               .Rs1E(Rs1E), .Rs2E(Rs2E), .RdM(RdM), .RdE(RdE), .RdW(RdW), .Rs1D(Rs1D), .Rs2D(Rs2D),
               .RegWriteMout(RegWriteMout), .RegWriteWout(RegWriteWout), .RSE0out(ResultSrcE0out), .PCSrcEout(PCSrcEout), .FlushD(FlushD));
   
