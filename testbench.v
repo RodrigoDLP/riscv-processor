@@ -8,12 +8,16 @@ module tb();
         .WriteData(WriteData),
         .DataAdr(DataAdr),
         .MemWrite(MemWrite));
-  always #5 clk = ~clk;
+  always begin 
+    $display("RAM0=%h", a.dmem.RAM[0]);
+    #10 
+    clk = ~clk; 
+  end
   initial begin
-    clk = 1; reset = 1; #10
+    clk = 1; reset = 1; #20
     reset = 0;
-    #300
-    $display("RAM96=%h, RAM100=%h", a.dmem.RAM[24], a.dmem.RAM[25]);
+    #5000
+    $display("RAM0=%h, RAM4=%h, RAM40=%h, RAM44=%h, RAM48=%h, RAM52=%h", a.dmem.RAM[0], a.dmem.RAM[1], a.dmem.RAM[10], a.dmem.RAM[11], a.dmem.RAM[12], a.dmem.RAM[13]);
     $finish;
   end
   initial begin
