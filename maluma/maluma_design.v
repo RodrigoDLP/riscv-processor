@@ -585,29 +585,28 @@ module int_to_float(
     assign sign = a_int[31];
     assign abs_a = sign ? (~a_int + 1) : a_int;
 
-    // 2. Encontrar el primer '1' (Leading Zero Detector)
-    // Usamos una implementación behavioral simple para no complicar con módulos extra
-    // Si ya tienes un módulo lzd32, úsalo aquí.
-    function [4:0] get_lzd;
-        input [31:0] val;
-        integer i;
-        begin
-            get_lzd = 32; // Default si es 0
-            for (i = 31; i >= 0; i = i - 1) begin
-                if (val[i] && (get_lzd == 32)) get_lzd = 31 - i;
-            end
-        end
-    endfunction
-    assign lz = get_lzd(abs_a);
+    // 2. Usar tu módulo lzd32 existente (Más seguro que una función)
+    // Esto calculará correctamente que para el número 2, lz es 30.
+    lzd32 detector_ceros(
+        .a(abs_a), 
+        .b(lz)
+    );
 
     // 3. Calcular Exponente
-    // Ecuación: 127 + 31 - lz = 158 - lz
+    // Para el número 2 (lz=30): 158 - 30 = 128. (128 es el exponente para 2.0)
+    // Para el número 0: Exponente 0.
     assign exponent = (a_int == 0) ? 0 : (158 - lz);
 
-    // 4. Calcular Mantisa (Normalización)
-    // Desplazamos a la izquierda para quitar los ceros iniciales y el primer 1 implícito
-    assign abs_shifted = abs_a << (lz + 1);
-    assign mantissa = abs_shifted[31:9]; // Nos quedamos con los 23 bits superiores
+    // 4. Calcular Mantisa (Alineación)
+    // Desplazamos el número para que el bit más significativo (el 1) quede en la posición 31.
+    // Ejemplo con número 2 (...0010): lz=30.
+    // 2 << 30 = 10000000... (0x80000000)
+    assign abs_shifted = abs_a << lz;
+
+    // Tomamos los bits [30:8].
+    // ¿Por qué? El bit 31 es el "1 implícito" que no se guarda.
+    // Los siguientes 23 bits (30 bajando hasta 8) son la mantisa.
+    assign mantissa = abs_shifted[30:8]; 
 
     // 5. Ensamblar Resultado
     assign result = (a_int == 0) ? 32'b0 : {sign, exponent, mantissa};

@@ -729,7 +729,7 @@ module maindec(input  [6:0] op, output [1:0] ResultSrc, output MemWrite, output 
       7'b0010011: controls <= 16'b1_000_1_0_00_0_10_0_0_0_0_0; // I-type ALU
       7'b1101111: controls <= 16'b1_011_0_0_10_0_00_1_0_0_0_0; // jal
     7'b0110111: controls <= 16'b1_100_1_0_00_0_00_0_0_0_0_1; // lui
-    7'b1010011: controls <= 16'b1_xxx_0_0_00_0_11_0_1_0_1_0; // R-type FLOAT
+    7'b1010011: controls <= 16'b0_xxx_0_0_00_0_11_0_1_0_1_0; // R-type FLOAT
     7'b0000111: controls <= 16'b1_000_1_0_01_0_00_0_0_0_1_0; // lw FLOAT
     7'b0100111: controls <= 16'b0_001_1_1_00_0_00_0_0_1_0_0; // sw FLOAT
     7'b0000000: controls <= 16'b0; //safety measure for after reset
