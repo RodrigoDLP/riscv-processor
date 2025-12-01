@@ -411,6 +411,14 @@ module alu(input [31:0] a, b, input [2:0] alucontrol, output [31:0] result, outp
 endmodule
 
 
+
+
+
+
+
+
+
+
 module aludec(input opb5, input [2:0] funct3, input funct7b5, input [6:0] funct7, input [1:0] ALUOp, output [2:0] ALUControl);
   wire  RtypeSub; 
   reg [2:0] ALUControl_reg; 
@@ -424,6 +432,7 @@ module aludec(input opb5, input [2:0] funct3, input funct7b5, input [6:0] funct7
       5'b00001: ALUControl_reg = 3'b001;
       5'b00010: ALUControl_reg = 3'b010;
       5'b00011: ALUControl_reg = 3'b011;
+      5'b11010: ALUControl_reg = 3'b100;
       default: ALUControl_reg = 3'bxxx;
       	
     	endcase
@@ -442,7 +451,7 @@ endmodule
 
 
 
-      module controller(input [6:0] op, input [2:0] funct3, input funct7b5, input [6:0] funct7,
+module controller(input [6:0] op, input [2:0] funct3, input funct7b5, input [6:0] funct7,
                   output [1:0] ResultSrcD, output MemWriteD, JumpD, BranchD, ALUSrcD, RegWriteD,
                   output [2:0] ImmSrcD, output [2:0] ALUControlD, output ALUPickerD, FloatWriteDataD, FloatRegWriteD,
                  ForceR1ZeroD);
@@ -556,7 +565,8 @@ module datapath(input clk, reset,
   //DECODE
   regfile rf(.clk(clk), .reset(reset), .we3(RegWriteW), .a1(InstrD[19:15]), .a2(InstrD[24:20]), .a3(RdW),
              .wd3(ResultW), .rd1(RFRD1), .rd2(RFRD2));
-  reg [31:0] FRFRD1, FRFRD2, FRD1E, FRD2E;
+  wire [31:0] FRFRD1, FRFRD2;
+  reg [31:0] FRD1E, FRD2E;
   regfile floatrf(.clk(clk), .reset(reset), .we3(FloatRegWriteW), .a1(InstrD[19:15]), .a2(InstrD[24:20]), .a3(RdW),
                   .wd3(ResultW), .rd1(FRFRD1), .rd2(FRFRD2));
   assign RdD = InstrD[11:7];
@@ -580,7 +590,23 @@ module datapath(input clk, reset,
   alu alu(.a(SrcAE), .b(SrcBE), .alucontrol(ALUControlE), .result(ALUResultE), .zero(ZeroE));
   wire [31:0] floatResultE, FinalAluResult, FinalWriteDataE;
   wire [4:0] floatFlags;
-  alu32 floatalu(.a(FSrcAE), .b(FSrcBE), .ALUControl(ALUControlE), .f(floatResultE), .flags(floatFlags));
+  // alu32 floatalu(.a(FSrcAE), .b(FSrcBE), .ALUControl(ALUControlE), .f(floatResultE), .flags(floatFlags));
+
+  // ALU: mALUma
+  // =============
+  mALUma falu(
+    .clk(clk),
+    .rst(reset),
+    .op_A(FSrcAE),          
+    .op_B(FSrcBE),      
+    .op_A_int(SrcAE),
+    .op_code(ALUControlE),        // Código operación: 000=ADD, 001=SUB, 010=MUL, 011=DIV
+    .mode_fp(1'b1),              // 0=half(16-bit), 1=single(32-bit)
+    .round_mode(1'b0),           // Modo redondeo: 0=nearest even
+    .result(floatResultE),        
+    .flags(floatFlags)
+  );
+  // =============
   mux2 #(WIDTH) alupicker(.d0(ALUResultE), .d1(floatResultE), .s(ALUPickerE), .y(FinalAluResult));
   mux2 #(WIDTH) writedatapicker(.d0(WriteDataE), .d1(FWriteDataE), .s(FloatWriteDataE), .y(FinalWriteDataE));
     //OUTPUT DEL WRITE DATA DE FLOAT. SE NECESITA COPIAR TODO DESDE RD1E Y RD2E Y LOS MUX3 PARA QUE AL FINAL RECIÉN SE ELIJA EL RESULTADO. LUEGO SE ELIGE ENTRE LOS WRITEDATA PARA TENER SOLO UN FINALWRITEDATAE. FALTA ACTUALIZAR RISCVSINGLE Y DAR EFECTO A FLOATREGWRITE
