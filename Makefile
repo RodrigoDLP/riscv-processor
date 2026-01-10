@@ -12,7 +12,7 @@ VCD_FILE = test.vcd
 # =========================================================
 
 # Archivos de diseño para la prueba de la ALU
-PIPE_DESIGN_FILES = processor.v
+PIPE_DESIGN_FILES = processor.v maluma/maluma_design.v
 
 # Testbench para la ALU
 PIPE_TB_FILE = testbench.v

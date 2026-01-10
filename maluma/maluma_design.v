@@ -5,162 +5,156 @@
 `timescale 1ns / 1ns
 
 // Módulo Principal de la ALU
-module mALUma(
-    input clk,
-    input rst,
-    input start,
-    input [31:0] op_a,          
-    input [31:0] op_b,          
-    input [2:0] op_code,        // Código operación: 000=ADD, 001=SUB, 010=MUL, 011=DIV
-    input mode_fp,              // 0=half(16-bit), 1=single(32-bit)
-    input round_mode,           // Modo redondeo: 0=nearest even
-    output reg [31:0] result,   
-    output reg valid_out,       
-    output reg [4:0] flags      // [4:inexact, 3:invalid, 2:div_by_zero, 1:overflow, 0:underflow]
+module mALUma #(
+    parameter ELEM_WIDTH = 32
+) (
+    input clk,                             // Mantenemos CLK en caso de que los submódulos lo usen
+    input rst,                             // Mantenemos RST
+    input [ELEM_WIDTH-1:0] op_A,
+    input [ELEM_WIDTH-1:0] op_B,
+    input [ELEM_WIDTH-1:0] op_A_int,
+    input [2:0] op_code,                   // Código operación: 000=ADD, 001=SUB, 010=MUL, 011=DIV
+    input mode_fp,                         // 0=half(16-bit), 1=single(32-bit)
+    input round_mode,                      // Modo redondeo: 0=nearest even
+    output [ELEM_WIDTH-1:0] result,
+    output [4:0] flags
 );
-
-    parameter IDLE    = 1'b0;
-    parameter COMPUTE = 1'b1;
     
-    reg state, next_state;
-    
+    //----------------------------------------------------------------------
+    // Cables y Registros internos
+    //----------------------------------------------------------------------
     wire [31:0] result_add_32, result_sub_32, result_mul, result_div;
     wire [15:0] result_add_16, result_sub_16;
     wire [4:0] flags_add_32, flags_sub_32, flags_add_16, flags_sub_16, flags_mul, flags_div;
+    wire [31:0] result_cvt;
+
+    // Resultados seleccionados (combinacionales)
     reg [31:0] result_selected;
     reg [4:0] flags_selected;
     
+    //----------------------------------------------------------------------
+    // 1. Instanciación de Submódulos (Sin cambios)
+    //----------------------------------------------------------------------
+    
+    // Suma 32-bit
     SumSub #(
         .E_BITS(8),
         .M_BITS(23)
     ) suma_32 (
-        .A(op_a), .B(op_b),
+        .A(op_A), .B(op_B),
         .op(1'b0),
         .Result(result_add_32),
         .ALUFlags(flags_add_32)
     );
 
+    // Suma 16-bit
     SumSub #(
         .E_BITS(5),
         .M_BITS(10)
     ) suma_16 (
-        .A(op_a), .B(op_b),
+        .A(op_A[15:0]), .B(op_B[15:0]), // Solo pasamos los 16 bits inferiores
         .op(1'b0),
-        .Result(result_add_16),
+        .Result(result_add_16), // Convertir a 32 bits de salida
         .ALUFlags(flags_add_16)
     );
     
+    // Resta 32-bit
     SumSub #(
         .E_BITS(8),
         .M_BITS(23)
     ) resta_32 (
-        .A(op_a), .B(op_b),
+        .A(op_A), .B(op_B),
         .op(1'b1),
         .Result(result_sub_32),
         .ALUFlags(flags_sub_32)
     );
 
+    // Resta 16-bit
     SumSub #(
         .E_BITS(5),
         .M_BITS(10)
     ) resta_16 (
-        .A(op_a), .B(op_b),
+        .A(op_A[15:0]), .B(op_B[15:0]),
         .op(1'b1),
         .Result(result_sub_16),
         .ALUFlags(flags_sub_16)
     );
     
+    // Multiplicación (Asumimos 32-bit)
     fp_mul mul_module(
-        .a(op_a),
-        .b(op_b),
+        .a(op_A),
+        .b(op_B),
         .mode_fp(mode_fp),
         .round_mode(round_mode),
         .result(result_mul),
         .flags(flags_mul)
     );
     
+    // División (Asumimos 32-bit)
     fp_div div_module(
-        .a(op_a),
-        .b(op_b),
+        .a(op_A),
+        .b(op_B),
         .mode_fp(mode_fp),
         .round_mode(round_mode),
         .result(result_div),
         .flags(flags_div)
     );
+
+    // NUEVA INSTANCIA
+    int_to_float conversor (
+        .a_int(op_A_int), // Conectamos a la nueva entrada entera
+        .result(result_cvt)
+    );
     
+    //----------------------------------------------------------------------
+    // 2. Lógica de Selección (Combinacional)
+    //----------------------------------------------------------------------
+    // Selecciona el resultado y las flags en base al op_code y mode_fp
     always @(*) begin
-        case (op_code[1:0])
-            2'b00: begin
+        case (op_code)
+            3'b000: begin // ADD
                 if (mode_fp) begin
                     result_selected = result_add_32;
                     flags_selected = flags_add_32;
                 end else begin
-                    result_selected = result_add_16;
+                    // Nota: Si mode_fp=0 (16-bit), SumSub de 16-bit produce 16-bit. 
+                    // Necesitarás lógica de extensión de signo o cero si la salida es de 32 bits.
+                    // Para este ejemplo, SumSub 16-bit ya fue forzado a output de 32 bits en la instanciación.
+                    result_selected = {16'b0, result_add_16}; 
                     flags_selected = flags_add_16;
                 end
             end
-            2'b01: begin
+            3'b001: begin // SUB
                 if (mode_fp) begin
                     result_selected = result_sub_32;
                     flags_selected = flags_sub_32;
                 end else begin
-                    result_selected = result_sub_16;
+                    result_selected = {16'b0, result_sub_16};
                     flags_selected = flags_sub_16;
                 end
             end
-            2'b10: begin
+            3'b010: begin // MUL
                 result_selected = result_mul;
                 flags_selected = flags_mul;
             end
-            2'b11: begin
+            3'b011: begin // DIV
                 result_selected = result_div;
                 flags_selected = flags_div;
             end
-        endcase
-    end
-    
-    always @(posedge clk or posedge rst) begin
-        if (rst)
-            state <= IDLE;
-        else
-            state <= next_state;
-    end
-    
-    always @(*) begin
-        case (state)
-            IDLE: begin
-                if (start)
-                    next_state = COMPUTE;
-                else
-                    next_state = IDLE;
+            3'b100: begin
+                result_selected = result_cvt;
+                flags_selected = 5'b0; // Conversión simple no suele generar flags críticas (salvo inexact)
             end
-            COMPUTE: begin
-                next_state = IDLE;
+            default: begin
+                result_selected = {ELEM_WIDTH{1'b0}};
+                flags_selected = 5'b0;
             end
-            default: 
-                next_state = IDLE;
         endcase
-    end
-    
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
-            result <= 32'b0;
-            flags <= 5'b0;
-            valid_out <= 1'b0;
-        end else begin
-            case (state)
-                IDLE: begin
-                    valid_out <= 1'b0;
-                end
-                COMPUTE: begin
-                    result <= result_selected;
-                    flags <= flags_selected;
-                    valid_out <= 1'b1;
-                end
-            endcase
-        end
     end
 
+    // Asignación de las salidas (puramente combinacional)
+    assign result = result_selected[ELEM_WIDTH-1:0];
+    assign flags = flags_selected;
 endmodule
 
 module SumSub #(
@@ -573,4 +567,48 @@ module fp_div(
         end
     end
     
+endmodule
+
+// Módulo de Conversión Entero (Signed 32-bit) a Float (IEEE 754 32-bit)
+module int_to_float(
+    input [31:0] a_int,    // Entrada Entera (Complemento a 2)
+    output [31:0] result
+);
+    wire sign;
+    wire [31:0] abs_a;
+    wire [4:0] lz; // Leading Zeros
+    wire [7:0] exponent;
+    wire [31:0] abs_shifted;
+    wire [22:0] mantissa;
+
+    // 1. Signo y Valor Absoluto
+    assign sign = a_int[31];
+    assign abs_a = sign ? (~a_int + 1) : a_int;
+
+    // 2. Usar tu módulo lzd32 existente (Más seguro que una función)
+    // Esto calculará correctamente que para el número 2, lz es 30.
+    lzd32 detector_ceros(
+        .a(abs_a), 
+        .b(lz)
+    );
+
+    // 3. Calcular Exponente
+    // Para el número 2 (lz=30): 158 - 30 = 128. (128 es el exponente para 2.0)
+    // Para el número 0: Exponente 0.
+    assign exponent = (a_int == 0) ? 0 : (158 - lz);
+
+    // 4. Calcular Mantisa (Alineación)
+    // Desplazamos el número para que el bit más significativo (el 1) quede en la posición 31.
+    // Ejemplo con número 2 (...0010): lz=30.
+    // 2 << 30 = 10000000... (0x80000000)
+    assign abs_shifted = abs_a << lz;
+
+    // Tomamos los bits [30:8].
+    // ¿Por qué? El bit 31 es el "1 implícito" que no se guarda.
+    // Los siguientes 23 bits (30 bajando hasta 8) son la mantisa.
+    assign mantissa = abs_shifted[30:8]; 
+
+    // 5. Ensamblar Resultado
+    assign result = (a_int == 0) ? 32'b0 : {sign, exponent, mantissa};
+
 endmodule
